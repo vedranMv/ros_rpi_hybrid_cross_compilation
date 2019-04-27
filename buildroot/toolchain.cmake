@@ -4,6 +4,9 @@ SET(CMAKE_SYSTEM_NAME Linux)
 #  On systems that support uname, this variable is set to the output of uname -r
 #SET(CMAKE_HOST_SYSTEM_VERSION )
 
+# Grab location of piroot/ from the environment variables
+SET(PIROOT $ENV{PIROOT})
+
 # Specify location of the cross compiler
 SET(CMAKE_C_COMPILER /usr/bin/arm-linux-gnueabihf-gcc)
 SET(CMAKE_CXX_COMPILER /usr/bin/arm-linux-gnueabihf-g++)
