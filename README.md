@@ -1,6 +1,6 @@
 Hybrid cross-compilation for ROS-based projects for Raspberry Pi*
 ==================================
-## *(and other linux-armhf platforms)
+### *(and other linux-armhf platforms)
 
 ## Table of content
 1. [Summary](#summary)
@@ -9,9 +9,12 @@ Hybrid cross-compilation for ROS-based projects for Raspberry Pi*
 1. [Requirements](#requirements)
 1. [Preparing the host system](#preparing-the-host-system)
 1. [Preparing the target system](#preparing-the-target-system)
-1. [Cross-compiling ROS](#cross-compiling-ros)
+1. [Cross-compiling ROS (comm & robot)](#cross-compiling-ros-comm--robot)
 1. [Cross-compiling ROS projects](#cross-compiling-ros-projects)
 1. [Additional info](#additional-info)
+    1. [QEMU emulation](#qemu-emulation)
+1. [Things that don't work](#things-that-dont-work)
+1. [Contributions](#contributions)
 
 ## Summary
 This project outlines an approach for docker-based cross-compiling environment, suitable for building ROS projects for armhf architecture``*`` on a system with a different architecture. The method proposed here can also be used to cross-compile _ROS comm_ and _ROS robot_ variants.
@@ -36,7 +39,7 @@ The last article on the list sparked an idea of a "hybrid" environment for cross
 1. Use customized toolchain and gcc-linux-armhf (or compiler for your target system) to compile the workspace
 1. Pack the compilation outcome and send it to the target system
 
-## Repo structure
+## Repository structure
 
 Here's a brief overview of flies in the repository and their significance
 
@@ -83,7 +86,7 @@ Preparing the host system comes down to installing docker, pulling the image of 
 1. Get the docker image of the build server, here you have two options:
     * Pull the existing image from https://hub.docker.com/r/vedranmv/buildserver by running:
     ```bash
-    user@host:~$ docker pull vedranmv/buildserver:2.0
+    user@host:~$ docker pull vedranmv/buildserver
     ```
     *  **[OR]** Use a Dockerfile file supplied in the root of this repo to build an image of the build server
         1. Open the cloned repo
@@ -94,7 +97,7 @@ Preparing the host system comes down to installing docker, pulling the image of 
 
 1. Select a folder on the host system which you want to share with docker. This will be the build directory, containing the workspace to be compiled, toolchain and compilation outcome. I used ``/usr/local/build`` folder on the host system which was mapped to the same folder inside the docker container. If you prefer different folder, change ``$WS`` variable inside ``buildroot/build.env`` file.
 
-1. Start docker container with the command below. If everything went okay, there should be only container ID and name printed on the terminal. 
+1. Start docker container with the command below. If everything went okay, there should be only container ID and name printed on the terminal. (3 error messages can show up if you don't supply ssh keys in ``ssh/`` folder) 
     ```bash
     user@host:~/ros_rpi_hybrid_cross_compilation$ ./start-buildserver.sh
     ```
@@ -107,6 +110,9 @@ Preparing the host system comes down to installing docker, pulling the image of 
     root@buildserver:~$ exit
     user@host:~$ docker stop <container_name>
     ```
+
+> Later on, use ``docker start <container_name>`` followed by ``docker exec -ti <container_name> bash`` to start the container and open its terminal.
+
 ## Preparing the target system
 
 As the name hinted, this is a hybrid cross compilation which means that part of the work needs to be done on the target system as well. More precisely, collect all ROS dependencies and those of a project being compiling. It's tricky to do that directly on the host system, instead we install them on the target system first, and then copy them from there into the toolchain. First, ensure you have raspbian running, either natively or emulated (check [Additional info](#additional-info) for how to use emulated raspbian).
@@ -141,7 +147,7 @@ Now we need to import & process the target filesystem. What we're doing here is 
 ```bash
 ~user@host$ source /path/to/build.env
 ~user@host$ cd $WS/img_processing
-~user@host$ sudo process_img.bash /media/user/rootfs
+~user@host$ sudo ./process_img.bash /media/user/rootfs
 Copying data from mounted directory...done
 Prepring environment for chroot...done
 Executing the script in chroot..../cp: cannot stat '/lib_orig/./cpp': No such file or directory
@@ -154,6 +160,8 @@ Your environment is now ready for crosscompiling
 ``*``If you don't like running this script outside docker, you could try manually copy the folders into the shared build directory and then run the script from within docker
 
 ## Cross-compiling ROS (comm & robot)
+
+> Make sure the build server is running before continuing. Use ``docker start <container_name>`` followed by ``docker exec -ti <container_name> bash`` on host system to start the container and open its terminal.
 
 For now, only _ros_comm_ and _ros_robot_ variants can be built by this method. In _ros_robot_, _collada_urdf_ package stubbornly fails to compile with errors about missing include files. Fixing include files yields an error about pkg-config. As of this writing, the only solution is to skip building _collada_urdf_.
 
@@ -194,11 +202,14 @@ libcpp_common.so: ELF 32-bit LSB shared object, ARM, EABI5 version 1 (SYSV), dyn
 
 
 ## Cross-compiling ROS projects
+
+> Make sure the build server is running before continuing. Use ``docker start <container_name>`` followed by ``docker exec -ti <container_name> bash`` on host system to start the container and open its terminal.
+
 Before continuing, ensure that ROS install directory on the build server is the same as the one on the target system. This is important due to the nature of catkin workspaces overlaying:
 * If you've cross-compiled ROS in previous step, symlink the install folder and source the environment:
     ```bash
     root@buildserver:~$ mkdir /opt/ros
-    root@buildserver:~$ ln -s $WS/ros_cross_robot /opt/ros/kinetic
+    root@buildserver:~$ ln -s $WS/ros_cross_robot/install_isolated /opt/ros/kinetic
     root@buildserver:~$ source /opt/ros/kinetic/setup.bash
     ```
 * If you've imported precompiled ROS from the target system (usually installed in /opt/ros/...), create symlink to it and source the environment:
@@ -225,15 +236,21 @@ root@buildserver:~catkin_project_ws$ catkin_make_isolated --install -DCMAKE_TOOL
 ```
 Once the compilation is done, zip the _install_isolated_ folder and unpack it on the target system. If the ROS has been cross-compiled as well, copy _install_isolated_ folder from _ros_cross*_ workspace to ``/opt/ros/<ros version>`` on the target system and source the environment there.
 
+> When finished, exit and stop the container as shown in the last step of [Preparing the host system](#preparing-the-host-system)
+
+
 ## Additional info
 
 
 ### QEMU emulation
-_TODO_
+_(TODO)_
 
 
 ## Things that don't work
 * compiling _collada_urdf_ package from _ros_robot_ variant
 * compile desktop - fails when linking some graphical libraries that require QT executables in the linking process
-* use multiarch support in dpkg to install ros for armhf directly in docker with all of its dependencies
+* use of multiarch support in dpkg to install ros for armhf directly in docker with all of its dependencies
 
+## Contributions
+
+Feel free to drop any suggestions, comments, ideas ^^
