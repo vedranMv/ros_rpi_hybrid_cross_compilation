@@ -61,7 +61,8 @@ RUN apt-get update && \
     python-rosdep \
     python-rosinstall-generator \
     python-wstool \
-    python-rosinstall
+    python-rosinstall \
+    python-nose
 
 # Make directory for SSH keys
 RUN mkdir /root/.ssh
