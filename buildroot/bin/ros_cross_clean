@@ -1,0 +1,5 @@
+#!/bin/bash
+
+rm build_isolated/ -r
+rm devel_isolated/ -r
+rm install_isolated/ -r

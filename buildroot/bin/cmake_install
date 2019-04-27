@@ -1,0 +1,21 @@
+#!/bin/bash
+
+if (( $# != 1 )); then
+    echo "Illegal number of arguments"
+    echo "Usage: cmake_install <cmake-*-x86_64.tar.gz>"
+    exit 0
+fi
+
+fileName=$1
+
+tar -xvf $fileName
+
+cd ${fileName%".tar.gz"}
+
+cp -r bin /usr
+cp -r share /usr
+cp -r doc /usr/share
+cp -r man /usr/share
+
+cd ..
+rm ${fileName} -r
